@@ -46,7 +46,8 @@ import java.util.List;
  * Bluetooth LE API.
  */
 public class DeviceControlActivity extends Activity {
-    private final static String TAG = DeviceControlActivity.class.getSimpleName();
+    //private final static String TAG = DeviceControlActivity.class.getSimpleName();
+    final String TAG = "BLE_TEST";
 
     public static final String EXTRAS_DEVICE_NAME = "DEVICE_NAME";
     public static final String EXTRAS_DEVICE_ADDRESS = "DEVICE_ADDRESS";

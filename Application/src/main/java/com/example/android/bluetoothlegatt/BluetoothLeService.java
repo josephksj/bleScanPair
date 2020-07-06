@@ -40,7 +40,8 @@ import java.util.UUID;
  * given Bluetooth LE device.
  */
 public class BluetoothLeService extends Service {
-    private final static String TAG = BluetoothLeService.class.getSimpleName();
+    //private final static String TAG = BluetoothLeService.class.getSimpleName();
+    private final static String TAG = "BLE_TEST";
 
     private BluetoothManager mBluetoothManager;
     private BluetoothAdapter mBluetoothAdapter;
