@@ -21,8 +21,10 @@ import android.app.ListActivity;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -35,8 +37,11 @@ import android.widget.BaseAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.util.Log;
 
+import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Set;
 
 /**
  * Activity for scanning and displaying available Bluetooth LE devices.
@@ -45,6 +50,7 @@ public class DeviceScanActivity extends ListActivity {
     private LeDeviceListAdapter mLeDeviceListAdapter;
     private BluetoothAdapter mBluetoothAdapter;
     private boolean mScanning;
+    private boolean mConnectionInProgress;
     private Handler mHandler;
 
     private static final int REQUEST_ENABLE_BT = 1;
@@ -55,6 +61,7 @@ public class DeviceScanActivity extends ListActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "DeviceScanActivity  onCreate");
         getActionBar().setTitle(R.string.title_devices);
         mHandler = new Handler();
 
@@ -77,6 +84,38 @@ public class DeviceScanActivity extends ListActivity {
             finish();
             return;
         }
+        dispPairedDevice();
+        registerReceiver(adbCmdReceiver, adbCmdReceiverIntentFilter());
+
+        final IntentFilter filter = new IntentFilter(BluetoothDevice.ACTION_ACL_DISCONNECTED);
+        registerReceiver(adbCmdReceiver, filter);
+
+        final IntentFilter bondFilter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        registerReceiver(adbCmdReceiver, bondFilter);
+
+        mConnectionInProgress = false;
+    }
+
+    public void dispPairedDevice() {
+        Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
+
+        Log.d(TAG, "======== Paired Devices Start ===========");
+        if (pairedDevices.size() > 0) {
+            // There are paired devices. Get the name and address of each paired device.
+            for (BluetoothDevice device : pairedDevices) {
+                String deviceName = device.getName();
+                String deviceHardwareAddress = device.getAddress(); // MAC address
+                Log.d(TAG, deviceHardwareAddress+ "  "+ deviceName);
+            }
+        }
+        Log.d(TAG, "======== Paired Devices End ===========");
+
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "DeviceScanActivity  onDestroy");
+        unregisterReceiver(adbCmdReceiver);
     }
 
     @Override
@@ -126,6 +165,7 @@ public class DeviceScanActivity extends ListActivity {
         mLeDeviceListAdapter = new LeDeviceListAdapter();
         setListAdapter(mLeDeviceListAdapter);
         scanLeDevice(true);
+        mConnectionInProgress = false;
     }
 
     @Override
@@ -149,6 +189,20 @@ public class DeviceScanActivity extends ListActivity {
     protected void onListItemClick(ListView l, View v, int position, long id) {
         final BluetoothDevice device = mLeDeviceListAdapter.getDevice(position);
         if (device == null) return;
+        int devType = device.getType();
+        Log.d(TAG, "========= BluetoothType: "+devType); //1-Classic, 2-LE, 3-Dual
+/*
+        Boolean isBonded = false;
+        isBonded = device.createBond();
+        if(isBonded) {
+            Log.d(TAG, "========= createBond Retrun OK");
+        } else {
+            Log.d(TAG, "========= createBond Retrun FAILED");
+        }
+*/
+       // pairDevice(device);
+
+
         final Intent intent = new Intent(this, DeviceControlActivity.class);
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.getName());
         intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.getAddress());
@@ -158,8 +212,40 @@ public class DeviceScanActivity extends ListActivity {
         }
         startActivity(intent);
     }
+    private void pairDevice_1(BluetoothDevice device) {
+        String ACTION_PAIRING_REQUEST = "android.bluetooth.device.action.PAIRING_REQUEST";
+        Intent intent = new Intent(ACTION_PAIRING_REQUEST);
+        String EXTRA_DEVICE = "android.bluetooth.device.extra.DEVICE";
+        intent.putExtra(EXTRA_DEVICE, device);
+        String EXTRA_PAIRING_VARIANT = "android.bluetooth.device.extra.PAIRING_VARIANT";
+        int PAIRING_VARIANT_PIN = 0;
+        intent.putExtra(EXTRA_PAIRING_VARIANT, PAIRING_VARIANT_PIN);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        startActivity(intent);
+    }
+    private void pairDevice(BluetoothDevice device) {
+        try {
+            Log.d(TAG, "Start Pairing...");
+            Method m = device.getClass()
+                    .getMethod("createBond", (Class[]) null);
+            m.invoke(device, (Object[]) null);
+            Log.d(TAG, "Pairing finished.");
+        } catch (Exception e) {
+            Log.e(TAG, e.getMessage());
+        }
+    }
+    private void unpairDevice(BluetoothDevice device) {
+        try {
+            Method m = device.getClass()
+                    .getMethod("removeBond", (Class[]) null);
+            m.invoke(device, (Object[]) null);
+        } catch (Exception e) {
+            Log.e(TAG, e.getMessage());
+        }
+    }
 
     private void scanLeDevice(final boolean enable) {
+        Log.d(TAG, "In scanLeDevice");
         if (enable) {
             // Stops scanning after a pre-defined scan period.
             mHandler.postDelayed(new Runnable() {
@@ -168,6 +254,7 @@ public class DeviceScanActivity extends ListActivity {
                     mScanning = false;
                     mBluetoothAdapter.stopLeScan(mLeScanCallback);
                     invalidateOptionsMenu();
+                    displayScanResults();
                 }
             }, SCAN_PERIOD);
 
@@ -178,6 +265,19 @@ public class DeviceScanActivity extends ListActivity {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
         }
         invalidateOptionsMenu();
+    }
+
+    private void displayScanResults() {
+        Log.d("displayScanResults", "Joseph Kizhakkeparampil");
+         int count = mLeDeviceListAdapter.getCount();
+        for(int i=0; i<count; i++) {
+             BluetoothDevice curDev = mLeDeviceListAdapter.getDevice(i);
+            if(curDev.getName() != null) {
+                Log.d(TAG, "Device-" + i + " " + curDev.getAddress() + " " + curDev.getName());
+            } else {
+                Log.d(TAG, "Device-" + i + " " + curDev.getAddress() + " Unknown Device");
+            }
+        }
     }
 
     // Adapter for holding devices found through scanning.
@@ -266,4 +366,136 @@ public class DeviceScanActivity extends ListActivity {
         TextView deviceName;
         TextView deviceAddress;
     }
+
+    private final BroadcastReceiver adbCmdReceiver = new BroadcastReceiver() {
+         @Override
+        public void onReceive(Context context, Intent intent) {
+            //final String action = intent.getAction();
+            Log.i(TAG, "KSJ In onReceive for Intent");
+             String action = intent.getAction();
+            if("com.example.android.bluetoothlegatt.TEST_ACTION".equals(action)){
+                String rxText = intent.getStringExtra("com.example.android.bluetoothlegatt.EXTRA_TEXT");
+                Log.i(TAG, "RxedCmdText: "+rxText);
+                if("start_scan".equals(rxText)) {
+                    scanLeDevice(true);
+                } else if("stop_scan".equals(rxText)) {
+                    scanLeDevice(false);
+                } else if(!rxText.isEmpty()){
+                    String delims = "[ ]+";
+                    String[] tokens = rxText.split(delims);
+                    //for (int i = 0; i < tokens.length; i++)
+                    //    Log.i(TAG, tokens[i]);
+                    if(tokens[0].equals("connect")) {
+                        connectDevice(tokens);
+                    } else if(tokens[0].equals("disconnect")) {
+                        disconnectDevice(tokens);
+                    } else if(tokens[0].equals("pair")) {
+                        pairDeviceWithAddr(tokens);
+                    }else if(tokens[0].equals("unpair")) {
+                        unpairDeviceWithAddr(tokens);
+                    }else if(tokens[0].equals("lspair")) {
+                        dispPairedDevice();
+                    }else if(tokens[0].equals("lsscan")) {
+                        displayScanResults();
+                    }
+                }
+            } else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
+                int previousState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
+                Log.d(TAG, "<<<ACTION_BOND_STATE_CHANGED: state:>>> " + state + ", previous:" + previousState);
+                //listener.onDevicePairingEnded();
+                // BOND_BONDED = 12
+                // BOND_BONDING = 11
+                // BOND_NONE = 10
+            } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
+                Log.d(TAG, "<<<ACTION_ACL_CONNECTED:  >>> " );
+            } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
+                Log.d(TAG, "<<<ACTION_ACL_DISCONNECTED:  >>> " );
+            }else if (BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED.equals(action)) {
+                Log.d(TAG, "<<<ACTION_ACL_DISCONNECT_REQUESTED:  >>> " );
+            }else if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
+                int pairingKey = intent.getIntExtra(BluetoothDevice.EXTRA_PAIRING_VARIANT, -1);
+                Log.d(TAG, "<<<ACTION_PAIRING_REQUEST:  >>> " + pairingKey); // 0-Pin, 2-PassKey
+            }
+        }
+    };
+
+
+
+    private void pairDeviceWithAddr(String[] tokens) {
+        if(tokens.length < 2) {
+            Log.i(TAG, "Invalid param for Pairing");
+            return;
+        }
+        Log.i(TAG, "pairDeviceWithAddr: "+tokens[1]);
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(tokens[1]);
+        if (device == null) {
+            Log.i(TAG, "Pairing Device Not Detected: "+tokens[1]);
+            return;
+        }
+        pairDevice(device);
+    }
+
+    private void unpairDeviceWithAddr(String[] tokens) {
+        if(tokens.length < 2) {
+            Log.i(TAG, "Invalid param for Pairing");
+            return;
+        }
+        Log.i(TAG, "unpairDeviceWithAddr: "+tokens[1]);
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(tokens[1]);
+        if (device == null) {
+            Log.i(TAG, "Unpairing Device Not Detected: "+tokens[1]);
+            return;
+        }
+        unpairDevice(device);
+    }
+
+
+
+
+    private void connectDevice(String[] tokens) {
+        if(mConnectionInProgress) {
+            Log.i(TAG, "Connected or Connection In Progress");
+            return;
+        }
+        if(tokens.length < 2) {
+            Log.i(TAG, "Invalid param for connect");
+            return;
+        }
+        Log.i(TAG, "Connecting to: "+tokens[1]);
+
+        final Intent intentController = new Intent(DeviceScanActivity.this, DeviceControlActivity.class);
+        if(tokens.length == 3) {
+            intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, tokens[2]);
+        } else {
+            intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, "Unknown Device");
+        }
+        intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, tokens[1]);
+        if (mScanning) {
+            mBluetoothAdapter.stopLeScan(mLeScanCallback);
+            mScanning = false;
+        }
+        startActivity(intentController);
+        mConnectionInProgress = true;
+
+    }
+
+    private void disconnectDevice(String[] tokens) {
+        if(!mConnectionInProgress) {
+            Log.i(TAG, "Not Connected or Not In Progress");
+            return;
+        }
+
+    }
+
+    private static IntentFilter adbCmdReceiverIntentFilter() {
+        final IntentFilter intentFilter = new IntentFilter();
+        //intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
+        //intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
+        //intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
+        //intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction("com.example.android.bluetoothlegatt.TEST_ACTION");
+        return intentFilter;
+    }
+
 }
