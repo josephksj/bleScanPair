@@ -110,6 +110,42 @@ public class DeviceControlActivity extends Activity {
                 displayGattServices(mBluetoothLeService.getSupportedGattServices());
             } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
                 displayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
+            } else if ("com.example.android.bluetoothlegatt.TEST_ACTION".equals(action)) {
+                Log.i(TAG, "Control Activity.TEST_ACTION");
+                String rxText = intent.getStringExtra("com.example.android.bluetoothlegatt.EXTRA_TEXT");
+                if(!rxText.isEmpty()) {
+                    String delims = "[ ]+";
+                    String[] tokens = rxText.split(delims);
+                    if (tokens.length <= 0) {
+                        return;
+                    }
+                    if (tokens[0].equals("disconnect")) {
+                        // mBluetoothLeService.connect(mDeviceAddress);
+                        mBluetoothLeService.disconnect();
+                        onBackPressed(); //Issue connect from ScanActivity
+                    } else if (tokens[0].equals("indication")) {
+                        processIndicationCmd(tokens);
+                    }
+                }
+            }
+        }
+        public void processIndicationCmd(String[] tokens) {
+            Log.i(TAG, "Control Activity.Indication");
+            for (ArrayList<BluetoothGattCharacteristic> gatCharParent : mGattCharacteristics) {
+                Log.i(TAG, "============================");
+                for (BluetoothGattCharacteristic gatCharChild : gatCharParent) {
+                    String uuid = gatCharChild.getUuid().toString();
+                    Log.i(TAG, "-------"+uuid);
+                    if((tokens.length == 2) && (tokens[1].equals(uuid))){
+                        Log.i(TAG, "Found Characterists: "+uuid);
+                        final int charaProp = gatCharChild.getProperties();
+                        if ((charaProp | BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0) {
+                            mNotifyCharacteristic = gatCharChild;
+                            mBluetoothLeService.setCharacteristicNotification(gatCharChild, true);
+                        }
+                        return;
+                    }
+                }
             }
         }
     };
