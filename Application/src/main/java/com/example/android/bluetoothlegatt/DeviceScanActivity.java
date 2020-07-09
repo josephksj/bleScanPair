@@ -245,7 +245,7 @@ public class DeviceScanActivity extends ListActivity {
     }
 
     private void scanLeDevice(final boolean enable) {
-        Log.d(TAG, "In scanLeDevice");
+        Log.d(TAG, "In scanLeDevice KSJ");
         if (enable) {
             // Stops scanning after a pre-defined scan period.
             mHandler.postDelayed(new Runnable() {
@@ -390,9 +390,9 @@ public class DeviceScanActivity extends ListActivity {
                     } else if(tokens[0].equals("disconnect")) {
                         disconnectDevice(tokens);
                     } else if(tokens[0].equals("pair")) {
-                        pairDeviceWithAddr(tokens);
+                        pairDeviceWithName(tokens, true);
                     }else if(tokens[0].equals("unpair")) {
-                        unpairDeviceWithAddr(tokens);
+                        pairDeviceWithName(tokens, false);
                     }else if(tokens[0].equals("lspair")) {
                         dispPairedDevice();
                     }else if(tokens[0].equals("lsscan")) {
@@ -420,64 +420,68 @@ public class DeviceScanActivity extends ListActivity {
         }
     };
 
-
-
-    private void pairDeviceWithAddr(String[] tokens) {
-        if(tokens.length < 2) {
-            Log.i(TAG, "Invalid param for Pairing");
+    private void pairDeviceWithName(String[] tokens, boolean flagPairing) {
+        String logMsg;
+        if(flagPairing) {
+            logMsg = "Pairing ";
+        } else {
+            logMsg = "Pairing ";
+        }
+        if(tokens.length < 3) {
+            Log.i(TAG, logMsg + "Invalid param (pair A/N <address>/<name>)");
             return;
         }
-        Log.i(TAG, "pairDeviceWithAddr: "+tokens[1]);
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(tokens[1]);
+        String address;
+        if("N".equals(tokens[1])) {
+            address = getAddressFromName(tokens[2]);
+            if(address.isEmpty()) {
+                Log.i(TAG, logMsg + "ScanList missing: "+tokens[2]);
+                return;
+            }
+        } else if("A".equals(tokens[1])) {
+            address = tokens[2];
+        } else {
+            Log.i(TAG, logMsg + "Invalid param (pair A/N <address>/<name>)");
+            return;
+        }
+        Log.i(TAG, logMsg + "DeviceWithAddress: "+ address);
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
         if (device == null) {
-            Log.i(TAG, "Pairing Device Not Detected: "+tokens[1]);
+            Log.i(TAG, logMsg + "Device Not Detected: "+tokens[1]);
             return;
         }
-        pairDevice(device);
+        if(flagPairing) {
+            pairDevice(device);
+        } else {
+            unpairDevice(device);
+        }
     }
-
-    private void unpairDeviceWithAddr(String[] tokens) {
-        if(tokens.length < 2) {
-            Log.i(TAG, "Invalid param for Pairing");
-            return;
-        }
-        Log.i(TAG, "unpairDeviceWithAddr: "+tokens[1]);
-        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(tokens[1]);
-        if (device == null) {
-            Log.i(TAG, "Unpairing Device Not Detected: "+tokens[1]);
-            return;
-        }
-        unpairDevice(device);
-    }
-
-
-
 
     private void connectDevice(String[] tokens) {
         if(mConnectionInProgress) {
             Log.i(TAG, "Connected or Connection In Progress");
             return;
         }
-        if(tokens.length < 2) {
+        if(tokens.length != 2) {
             Log.i(TAG, "Invalid param for connect");
             return;
         }
-        Log.i(TAG, "Connecting to: "+tokens[1]);
-
-        final Intent intentController = new Intent(DeviceScanActivity.this, DeviceControlActivity.class);
-        if(tokens.length == 3) {
-            intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, tokens[2]);
-        } else {
-            intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, "Unknown Device");
+        Log.i(TAG, "Connecting to (Name): "+tokens[1]);
+        String address = getAddressFromName(tokens[1]);
+        if(address.isEmpty()) {
+            Log.i(TAG, "No Entry in ScanList for: "+tokens[1]);
+            return;
         }
-        intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, tokens[1]);
+        Log.i(TAG, "Connecting to (Name): "+ tokens[1] + " Addr: "+address);
+        final Intent intentController = new Intent(DeviceScanActivity.this, DeviceControlActivity.class);
+        intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, tokens[1]);
+        intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, address);
         if (mScanning) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
             mScanning = false;
         }
         startActivity(intentController);
         mConnectionInProgress = true;
-
     }
 
     private void disconnectDevice(String[] tokens) {
@@ -497,5 +501,18 @@ public class DeviceScanActivity extends ListActivity {
         intentFilter.addAction("com.example.android.bluetoothlegatt.TEST_ACTION");
         return intentFilter;
     }
+
+    private String getAddressFromName(String name) {
+       if(name.isEmpty()){
+            return "";
+        }
+        int count = mLeDeviceListAdapter.getCount();
+        for(int i=0; i<count; i++) {
+            if(name.equals(mLeDeviceListAdapter.getDevice(i).getName())) {
+                return mLeDeviceListAdapter.getDevice(i).getAddress();
+            }
+        }
+        return "";
+     }
 
 }
