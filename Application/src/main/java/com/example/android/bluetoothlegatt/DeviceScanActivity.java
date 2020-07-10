@@ -213,6 +213,7 @@ public class DeviceScanActivity extends ListActivity {
         startActivity(intent);
     }
     private void pairDevice_1(BluetoothDevice device) {
+
         String ACTION_PAIRING_REQUEST = "android.bluetooth.device.action.PAIRING_REQUEST";
         Intent intent = new Intent(ACTION_PAIRING_REQUEST);
         String EXTRA_DEVICE = "android.bluetooth.device.extra.DEVICE";
@@ -224,6 +225,7 @@ public class DeviceScanActivity extends ListActivity {
         startActivity(intent);
     }
     private void pairDevice(BluetoothDevice device) {
+        //device.createBond();
         try {
             Log.d(TAG, "Start Pairing...");
             Method m = device.getClass()
@@ -462,19 +464,30 @@ public class DeviceScanActivity extends ListActivity {
             Log.i(TAG, "Connected or Connection In Progress");
             return;
         }
-        if(tokens.length != 2) {
-            Log.i(TAG, "Invalid param for connect");
+        if(tokens.length != 3) {
+            Log.i(TAG, "\"Invalid param (pair A/N <address>/<name>)");
             return;
         }
-        Log.i(TAG, "Connecting to (Name): "+tokens[1]);
-        String address = getAddressFromName(tokens[1]);
-        if(address.isEmpty()) {
-            Log.i(TAG, "No Entry in ScanList for: "+tokens[1]);
+        String address;
+        String devName = "Unkonwn";
+
+        if("N".equals(tokens[1])) {
+            address = getAddressFromName(tokens[2]);
+            if(address.isEmpty()) {
+                Log.i(TAG, "ScanList missing: "+tokens[2]);
+                return;
+            }
+            devName = tokens[2];
+         } else if("A".equals(tokens[1])) {
+            address = tokens[2];
+         } else {
+            Log.i(TAG, "Invalid param (pair A/N <address>/<name>)");
             return;
         }
-        Log.i(TAG, "Connecting to (Name): "+ tokens[1] + " Addr: "+address);
+        Log.i(TAG, "Connecting to: "+devName + " Addr: "+address);
+
         final Intent intentController = new Intent(DeviceScanActivity.this, DeviceControlActivity.class);
-        intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, tokens[1]);
+        intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, devName);
         intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, address);
         if (mScanning) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
