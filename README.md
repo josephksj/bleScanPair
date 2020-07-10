@@ -14,7 +14,8 @@ adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es 
 adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'lsscan'"
 adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'lspair'"
 
-adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'connect <name from the scan result>'"
+adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'connect N <name from the scan result>'"
+adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'connect A <addr from the scan result>'"
 adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'disconnect'"
 adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'indication <UUID>'"
 adb shell "am broadcast -a com.example.android.bluetoothlegatt.TEST_ACTION --es com.example.android.bluetoothlegatt.EXTRA_TEXT 'pair N <name from the scan result>'"
