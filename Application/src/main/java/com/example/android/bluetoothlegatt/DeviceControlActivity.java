@@ -17,6 +17,7 @@
 package com.example.android.bluetoothlegatt;
 
 import android.app.Activity;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothGattService;
 import android.content.BroadcastReceiver;
@@ -61,6 +62,7 @@ public class DeviceControlActivity extends Activity {
     private ArrayList<ArrayList<BluetoothGattCharacteristic>> mGattCharacteristics =
             new ArrayList<ArrayList<BluetoothGattCharacteristic>>();
     private boolean mConnected = false;
+    private boolean mPaired = false;
     private BluetoothGattCharacteristic mNotifyCharacteristic;
 
     private final String LIST_NAME = "NAME";
@@ -127,6 +129,16 @@ public class DeviceControlActivity extends Activity {
                         processIndicationCmd(tokens);
                     }
                 }
+            }else if (BluetoothDevice.ACTION_BOND_STATE_CHANGED.equals(action)) {
+                int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
+                int previousState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
+                Log.d(TAG, "=== CTRLR ACTION_BOND_STATE_CHANGED: state:>>> " + state + ", previous:" + previousState);
+                //listener.onDevicePairingEnded();
+                // BOND_BONDED = 12
+                // BOND_BONDING = 11
+                // BOND_NONE = 10
+                //if(state == BOND_BONDED) mPaired = true; else mPaired = false;
+                invalidateOptionsMenu();
             }
         }
         public void processIndicationCmd(String[] tokens) {
@@ -199,6 +211,8 @@ public class DeviceControlActivity extends Activity {
         mDeviceName = intent.getStringExtra(EXTRAS_DEVICE_NAME);
         mDeviceAddress = intent.getStringExtra(EXTRAS_DEVICE_ADDRESS);
 
+
+
         // Sets up UI references.
         ((TextView) findViewById(R.id.device_address)).setText(mDeviceAddress);
         mGattServicesList = (ExpandableListView) findViewById(R.id.gatt_services_list);
@@ -217,6 +231,9 @@ public class DeviceControlActivity extends Activity {
         super.onResume();
         Log.d(TAG, "ControlActivity onResume");
         registerReceiver(mGattUpdateReceiver, makeGattUpdateIntentFilter());
+        final IntentFilter bondFilter = new IntentFilter(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
+        registerReceiver(mGattUpdateReceiver, bondFilter);
+
         if (mBluetoothLeService != null) {
             final boolean result = mBluetoothLeService.connect(mDeviceAddress);
             Log.d(TAG, "Connect request result=" + result);
@@ -244,10 +261,23 @@ public class DeviceControlActivity extends Activity {
         getMenuInflater().inflate(R.menu.gatt_services, menu);
         if (mConnected) {
             menu.findItem(R.id.menu_connect).setVisible(false);
+            menu.findItem(R.id.menu_pair).setVisible(false);
+            menu.findItem(R.id.menu_unpair).setVisible(false);
             menu.findItem(R.id.menu_disconnect).setVisible(true);
         } else {
+            if(mBluetoothLeService != null) {
+                //-------- Check this device is paired -----
+                mPaired = mBluetoothLeService.isDevicePaired(mDeviceAddress);
+            }
             menu.findItem(R.id.menu_connect).setVisible(true);
             menu.findItem(R.id.menu_disconnect).setVisible(false);
+            if(mPaired) {
+                menu.findItem(R.id.menu_pair).setVisible(false);
+                menu.findItem(R.id.menu_unpair).setVisible(true);
+            } else {
+                menu.findItem(R.id.menu_pair).setVisible(true);
+                menu.findItem(R.id.menu_unpair).setVisible(false);
+            }
         }
         return true;
     }
@@ -261,6 +291,12 @@ public class DeviceControlActivity extends Activity {
                 return true;
             case R.id.menu_disconnect:
                 mBluetoothLeService.disconnect();
+                return true;
+            case R.id.menu_pair:
+                mPaired = mBluetoothLeService.pair(mDeviceAddress);
+                return true;
+            case R.id.menu_unpair:
+                mPaired = mBluetoothLeService.unpair(mDeviceAddress);
                 return true;
             case android.R.id.home:
                 onBackPressed();
@@ -353,6 +389,7 @@ public class DeviceControlActivity extends Activity {
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
         intentFilter.addAction("com.example.android.bluetoothlegatt.TEST_ACTION");
+        intentFilter.addAction("BluetoothDevice.ACTION_BOND_STATE_CHANGED");
         return intentFilter;
     }
 }

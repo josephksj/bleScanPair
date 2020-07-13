@@ -32,7 +32,9 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
+import java.lang.reflect.Method;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -332,4 +334,74 @@ public class BluetoothLeService extends Service {
 
         return mBluetoothGatt.getServices();
     }
+
+
+
+    public boolean pair(final String address) {
+        if (mBluetoothAdapter == null || address == null) {
+            Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
+            return false;
+        }
+        //------ Check already paired device ---
+        if(isDevicePaired(address)) {
+            Log.d(TAG, "Already Paried Device: " + address);
+            return true;
+        }
+        Log.d(TAG, "Pairing Device: " + address);
+        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+        if (device == null) {
+            Log.w(TAG, "Pairing Device not found: " + address);
+            return false;
+        }
+        try {
+            Method m = device.getClass().getMethod("createBond", (Class[]) null);
+            m.invoke(device, (Object[]) null);
+        } catch (Exception e) {
+            Log.e(TAG, e.getMessage());
+        }
+        return true;
+    }
+
+    public boolean unpair(final String address) {
+        if (mBluetoothAdapter == null || address == null) {
+            Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
+            return false;
+        }
+        //------ Check already unpaired device ---
+        if(!isDevicePaired(address)) {
+            Log.d(TAG, "Already UNParied Device: " + address);
+            return true;
+        }
+        Log.d(TAG, "UNPairing Device: " + address);
+        final BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
+        if (device == null) {
+            Log.w(TAG, "UNPairing Device not found: " + address);
+            return false;
+        }
+        try {
+            Method m = device.getClass().getMethod("removeBond", (Class[]) null);
+            m.invoke(device, (Object[]) null);
+        } catch (Exception e) {
+            Log.e(TAG, e.getMessage());
+        }
+        return true;
+    }
+
+    public boolean isDevicePaired(final String address) {
+        if (mBluetoothAdapter == null || address == null) {
+            Log.w(TAG, "BluetoothAdapter not initialized or unspecified address.");
+            return false;
+        }
+        //------ Check the paired device list ---
+        Set<BluetoothDevice> pairedDevices = mBluetoothAdapter.getBondedDevices();
+        for (BluetoothDevice device : pairedDevices) {
+            String deviceHardwareAddress = device.getAddress();
+            if (address.equals(deviceHardwareAddress)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
 }
+
