@@ -174,7 +174,19 @@ public class DeviceControlActivity extends Activity {
                 @Override
                 public boolean onChildClick(ExpandableListView parent, View v, int groupPosition,
                                             int childPosition, long id) {
-                    if (mGattCharacteristics != null) {
+                    if (mGattCharacteristics == null)
+                        return false;
+                    final BluetoothGattCharacteristic characteristic =
+                            mGattCharacteristics.get(groupPosition).get(childPosition);
+                    final int charaProp = characteristic.getProperties();
+                    final int maskFlag = BluetoothGattCharacteristic.PROPERTY_READ |
+                            BluetoothGattCharacteristic.PROPERTY_WRITE |
+                            BluetoothGattCharacteristic.PROPERTY_NOTIFY;
+                    if((charaProp&maskFlag) == 0)
+                        return true;
+
+
+ /*                   if (mGattCharacteristics != null) {
                         final BluetoothGattCharacteristic characteristic =
                                 mGattCharacteristics.get(groupPosition).get(childPosition);
                         final int charaProp = characteristic.getProperties();
@@ -203,6 +215,7 @@ public class DeviceControlActivity extends Activity {
                         }
                         return true;
                     }
+                    */
                     return false;
                 }
     };
@@ -349,8 +362,10 @@ public class DeviceControlActivity extends Activity {
         for (BluetoothGattService gattService : gattServices) {
             HashMap<String, String> currentServiceData = new HashMap<String, String>();
             uuid = gattService.getUuid().toString();
+
             currentServiceData.put(
                     LIST_NAME, SampleGattAttributes.lookup(uuid, unknownServiceString));
+
             Log.d(TAG,LIST_NAME+": "+SampleGattAttributes.lookup(uuid, unknownServiceString));
             currentServiceData.put(LIST_UUID, uuid);
             Log.d(TAG,LIST_UUID+": "+uuid);
@@ -368,8 +383,28 @@ public class DeviceControlActivity extends Activity {
                 charas.add(gattCharacteristic);
                 HashMap<String, String> currentCharaData = new HashMap<String, String>();
                 uuid = gattCharacteristic.getUuid().toString();
+                String charAttr = "--";
+                final int charProp = gattCharacteristic.getProperties();
+
+                if((charProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0) {
+                    charAttr = charAttr.concat("R-");
+                } else {
+                    charAttr = charAttr.concat("--");
+                }
+                if((charProp & BluetoothGattCharacteristic.PERMISSION_WRITE) > 0) {
+                    charAttr = charAttr.concat("W-");
+                } else {
+                    charAttr = charAttr.concat("--");
+                }
+                if((charProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0) {
+                    charAttr = charAttr.concat("N-");
+                } else {
+                    charAttr = charAttr.concat("--");
+                }
+                Log.d(TAG,"............."+charAttr);
+
                 currentCharaData.put(
-                        LIST_NAME, SampleGattAttributes.lookup(uuid, unknownCharaString));
+                        LIST_NAME, (SampleGattAttributes.lookup(uuid, unknownCharaString))+charAttr);
                 Log.d(TAG,"    "+LIST_NAME+": "+SampleGattAttributes.lookup(uuid, unknownCharaString));
                 currentCharaData.put(LIST_UUID, uuid);
                 Log.d(TAG,"    "+LIST_UUID+": "+uuid);
