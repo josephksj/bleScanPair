@@ -26,15 +26,20 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Button;
+import android.widget.CheckBox;
+import android.widget.EditText;
 import android.widget.ExpandableListView;
 import android.widget.SimpleExpandableListAdapter;
 import android.widget.TextView;
+import android.widget.ToggleButton;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -54,7 +59,8 @@ public class DeviceControlActivity extends Activity {
     public static final String EXTRAS_DEVICE_ADDRESS = "DEVICE_ADDRESS";
 
     private TextView mConnectionState;
-    private TextView mDataField;
+    private TextView mIndDataField;
+    private TextView mReadDataField;
     private String mDeviceName;
     private String mDeviceAddress;
     private ExpandableListView mGattServicesList;
@@ -69,6 +75,16 @@ public class DeviceControlActivity extends Activity {
     private final String LIST_UUID = "UUID";
     private int notificationCount = 0;
     private boolean mNotificationFlag = false;
+
+    private TextView mIndCountTxtView;
+    private BluetoothGattCharacteristic mListSelGattCharct = null;
+    private TextView mSelCharUuidTextView;
+    private Button mStartReadButton;
+    private Button mStartWriteButton;
+    private EditText mWriteDataEditText;
+    private ToggleButton mIndicationToggleButton;       //indication_sel_cb
+    private ToggleButton mRdDataDispHexChar;       //read_hex_char_tb
+    boolean mRdDatahexDispFlag = true;
 
     // Code to manage Service lifecycle.
     private final ServiceConnection mServiceConnection = new ServiceConnection() {
@@ -95,7 +111,7 @@ public class DeviceControlActivity extends Activity {
     // ACTION_GATT_CONNECTED: connected to a GATT server.
     // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
     // ACTION_GATT_SERVICES_DISCOVERED: discovered GATT services.
-    // ACTION_DATA_AVAILABLE: received data from the device.  This can be a result of read
+    // ACTION_IND_DATA_AVAILABLE: received data from the device.  This can be a result of read
     //                        or notification operations.
     private final BroadcastReceiver mGattUpdateReceiver = new BroadcastReceiver() {
         @Override
@@ -113,8 +129,10 @@ public class DeviceControlActivity extends Activity {
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
                 displayGattServices(mBluetoothLeService.getSupportedGattServices());
-            } else if (BluetoothLeService.ACTION_DATA_AVAILABLE.equals(action)) {
-                displayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
+            } else if (BluetoothLeService.ACTION_IND_DATA_AVAILABLE.equals(action)) {
+                indDisplayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
+            } else if (BluetoothLeService.ACTION_RD_DATA_AVAILABLE.equals(action)) {
+                readDisplayData(intent.getStringExtra(BluetoothLeService.EXTRA_DATA));
             } else if ("com.example.android.bluetoothlegatt.TEST_ACTION".equals(action)) {
                 Log.i(TAG, "Control Activity.TEST_ACTION");
                 String rxText = intent.getStringExtra("com.example.android.bluetoothlegatt.EXTRA_TEXT");
@@ -174,55 +192,53 @@ public class DeviceControlActivity extends Activity {
                 @Override
                 public boolean onChildClick(ExpandableListView parent, View v, int groupPosition,
                                             int childPosition, long id) {
+
                     if (mGattCharacteristics == null)
                         return false;
-                    final BluetoothGattCharacteristic characteristic =
-                            mGattCharacteristics.get(groupPosition).get(childPosition);
-                    final int charaProp = characteristic.getProperties();
+                    disableWindowSelection();
+                    mListSelGattCharct = mGattCharacteristics.get(groupPosition).get(childPosition);
+                    final int charaProp = mListSelGattCharct.getProperties();
                     final int maskFlag = BluetoothGattCharacteristic.PROPERTY_READ |
                             BluetoothGattCharacteristic.PROPERTY_WRITE |
                             BluetoothGattCharacteristic.PROPERTY_NOTIFY;
                     if((charaProp&maskFlag) == 0)
                         return true;
-
-
- /*                   if (mGattCharacteristics != null) {
-                        final BluetoothGattCharacteristic characteristic =
-                                mGattCharacteristics.get(groupPosition).get(childPosition);
-                        final int charaProp = characteristic.getProperties();
-                        if ((charaProp & BluetoothGattCharacteristic.PROPERTY_READ) > 0) {
-                            // If there is an active notification on a characteristic, clear
-                            // it first so it doesn't update the data field on the user interface.
-                            if (mNotifyCharacteristic != null) {
-                                mBluetoothLeService.setCharacteristicNotification(
-                                        mNotifyCharacteristic, false);
-                                mNotifyCharacteristic = null;
-                            }
-                            mBluetoothLeService.readCharacteristic(characteristic);
-                        }
-                        if ((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) > 0) {
-                            if(!mNotificationFlag) {    //Toggle the notfication for each click
-                                mNotificationFlag = true;
-                                mNotifyCharacteristic = characteristic;
-                                mBluetoothLeService.setCharacteristicNotification(
-                                        characteristic, true);
-                            } else {
-                                mNotificationFlag = false;
-                                mNotifyCharacteristic = null;
-                                mBluetoothLeService.setCharacteristicNotification(
-                                        characteristic, false);
-                            }
-                        }
-                        return true;
+                     mSelCharUuidTextView.setText(mListSelGattCharct.getUuid().toString());
+                    if((charaProp&BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0) {
+                        mIndicationToggleButton.setEnabled(false);
+                        mIndicationToggleButton.setBackgroundColor(Color.GRAY);
+                        //mIndicationCheckBox.setEnabled(false);
+                        //mIndicationCheckBox.setBackgroundColor(Color.GRAY);
+                    } else {
+                        mIndicationToggleButton.setEnabled(true);
+                        mIndicationToggleButton.setBackgroundColor(Color.WHITE);
+                        //mIndicationCheckBox.setEnabled(true);
+                        //mIndicationCheckBox.setBackgroundColor(Color.WHITE);
                     }
-                    */
+                    if((charaProp&BluetoothGattCharacteristic.PROPERTY_READ) == 0) {
+                        mStartReadButton.setText("No Read");
+                        mStartReadButton.setBackgroundColor(Color.GRAY);
+                    } else {
+                        mStartReadButton.setText("Start Read");
+                        mStartReadButton.setBackgroundColor(Color.WHITE);
+                    }
+                    if((charaProp&BluetoothGattCharacteristic.PROPERTY_WRITE) == 0) {
+                        mStartWriteButton.setText("No Write");
+                        mWriteDataEditText.setBackgroundColor(Color.GRAY);
+                        mWriteDataEditText.setFocusable(false); // disable editing
+                    } else {
+                        mStartWriteButton.setText("Data Write");
+                        mWriteDataEditText.setBackgroundColor(Color.WHITE);
+                        mWriteDataEditText.setFocusableInTouchMode(true);
+                    }
                     return false;
                 }
     };
 
     private void clearUI() {
         mGattServicesList.setAdapter((SimpleExpandableListAdapter) null);
-        mDataField.setText(R.string.no_data);
+        mIndDataField.setText(R.string.no_data);
+        mReadDataField.setText(R.string.no_data);
     }
 
     @Override
@@ -242,12 +258,45 @@ public class DeviceControlActivity extends Activity {
         mGattServicesList = (ExpandableListView) findViewById(R.id.gatt_services_list);
         mGattServicesList.setOnChildClickListener(servicesListClickListner);
         mConnectionState = (TextView) findViewById(R.id.connection_state);
-        mDataField = (TextView) findViewById(R.id.data_value);
+        mIndDataField = (TextView) findViewById(R.id.indication_value);
+        mIndCountTxtView = (TextView) findViewById(R.id.indication_count);
+        mReadDataField = (TextView) findViewById(R.id.read_value);
 
         getActionBar().setTitle(mDeviceName);
         getActionBar().setDisplayHomeAsUpEnabled(true);
+
+        mIndCountTxtView = (TextView) findViewById(R.id.indication_count);
+        mIndicationToggleButton = (ToggleButton) findViewById(R.id.indication_sel_tb);
+        mSelCharUuidTextView = (TextView) findViewById(R.id.charact_uuid);
+        mStartReadButton = (Button) findViewById(R.id.read_start_button);
+        mStartWriteButton = (Button) findViewById(R.id.write_start_button);
+        mWriteDataEditText = (EditText) findViewById(R.id.write_value);
+        mRdDataDispHexChar = (ToggleButton) findViewById(R.id.read_hex_char_tb); //read_hex_char_tb
+        disableWindowSelection();
+
         Intent gattServiceIntent = new Intent(this, BluetoothLeService.class);
         bindService(gattServiceIntent, mServiceConnection, BIND_AUTO_CREATE);
+    }
+
+    void disableWindowSelection() {
+        if(mNotifyCharacteristic != null) {
+            mBluetoothLeService.setCharacteristicNotification(mListSelGattCharct, false);
+            mNotifyCharacteristic = null;
+        }
+        mIndCountTxtView.setText("0");
+        mIndicationToggleButton.setEnabled(false);
+        mIndicationToggleButton.setBackgroundColor(Color.GRAY);
+        mSelCharUuidTextView.setText("No UUID Selected");
+        mIndDataField.setText("No Data");
+        mReadDataField.setText("No Data");
+        mStartReadButton.setText("No Read");
+        mStartWriteButton.setText("No Write");
+        mWriteDataEditText.setBackgroundColor(Color.GRAY);
+        mWriteDataEditText.setText("");
+        mWriteDataEditText.setFocusable(false); // disable editing
+        mRdDataDispHexChar.setText("Hex");
+        mRdDatahexDispFlag = true;
+        //mWriteDataEditText.setFocusableInTouchMode(true);
     }
 
     @Override
@@ -329,6 +378,98 @@ public class DeviceControlActivity extends Activity {
         return super.onOptionsItemSelected(item);
     }
 
+    public void onToggleButtonClicked(View view) {
+        boolean checkedTb = ((ToggleButton)view).isChecked();
+        switch(view.getId()) {
+            case R.id.indication_sel_tb:
+                processIndicationSel(checkedTb);
+                break;
+            case R.id.read_hex_char_tb:
+                if(checkedTb) {
+                    mRdDataDispHexChar.setText("Char");
+                    mRdDatahexDispFlag = false;
+                } else {
+                    mRdDataDispHexChar.setText("Hex");
+                    mRdDatahexDispFlag = true;
+                }
+                processIndicationSel(checkedTb);
+                break;
+        }
+    }
+
+    public void onButtonClicked(View view) {
+        if(mListSelGattCharct == null)
+            return;
+        switch(view.getId()) {
+            case R.id.read_start_button:
+                Log.d(TAG, "ControlActivity read_start_button ");
+                mBluetoothLeService.readCharacteristic(mListSelGattCharct);
+                break;
+            case R.id.write_start_button:
+                Log.d(TAG, "ControlActivity write_start_button ");
+                String wrMessage = mWriteDataEditText.getText().toString();
+                String delims = "[ ]+";
+                String[] tokens = wrMessage.split(delims);
+                if (tokens.length <= 0) {
+                    return;
+                }
+                 byte[] byteValue = new byte[tokens.length];
+                for (int i = 0; i < tokens.length; i++) {
+                     byteValue[i] = hexStingToByte(tokens[i]);
+                    /*
+                    final StringBuilder stringBuilder = new StringBuilder(2);
+                    stringBuilder.append(String.format("%02X ", byteValue[i]));
+                    Log.d(TAG, "Index: "+i + "  "+stringBuilder.toString());
+                    */
+                }
+                if (mNotifyCharacteristic != null) {
+                    mBluetoothLeService.setCharacteristicNotification(
+                            mNotifyCharacteristic, false);
+                    mNotifyCharacteristic = null;
+                }
+                mBluetoothLeService.writeCharacteristic(mListSelGattCharct, byteValue);
+                break;
+         }
+    }
+
+     //-- No parsing, just look the first two byte, if valid convert to byte
+    //-- String should have valid hex entry, otherwise always return 0 value
+    public byte hexStingToByte(String hexStr) {
+        byte byteData=0;
+        String upperStr;
+        if(hexStr.length() < 2)
+            return byteData;
+
+        upperStr = hexStr.toUpperCase();
+        if((upperStr.charAt(0)<'0') || (upperStr.charAt(0)>'F') ||
+                ((upperStr.charAt(0)>'9') && (upperStr.charAt(0)<'A')))
+            return byteData;
+        if((upperStr.charAt(1)<'0') || (upperStr.charAt(1)>'F') ||
+                ((upperStr.charAt(1)>'9') && (upperStr.charAt(1)<'A')))
+            return byteData;
+        byteData = (byte)((Character.digit(upperStr.charAt(0), 16)<<4) +
+                (Character.digit(upperStr.charAt(1), 16)));
+        return byteData;
+    }
+
+
+     public void processIndicationSel(boolean enableFlag) {
+        if(mListSelGattCharct == null)
+            return;
+        final int charaProp = mListSelGattCharct.getProperties();
+        if((charaProp & BluetoothGattCharacteristic.PROPERTY_NOTIFY) == 0)
+            return;
+        if(enableFlag) {
+            mNotifyCharacteristic = mListSelGattCharct;
+            mBluetoothLeService.setCharacteristicNotification(
+                    mListSelGattCharct, true);
+        } else {
+            mNotifyCharacteristic = null;
+            mBluetoothLeService.setCharacteristicNotification(
+                    mListSelGattCharct, false);
+        }
+    }
+
     private void updateConnectionState(final int resourceId) {
         runOnUiThread(new Runnable() {
             @Override
@@ -338,10 +479,30 @@ public class DeviceControlActivity extends Activity {
         });
     }
 
-    private void displayData(String data) {
+    private void indDisplayData(String data) {
         if (data != null) {
             notificationCount++;
-            mDataField.setText(" " +notificationCount + data);
+            mIndCountTxtView.setText(" "+notificationCount);
+            mIndDataField.setText(" " + data);
+            //mIndDataField.setText(" " +notificationCount + data);
+        }
+    }
+    private void readDisplayData(String data) {
+        if (data != null) {
+            if(mRdDatahexDispFlag) {
+                mReadDataField.setText(" " + data);
+            }else {
+                String delims = "[ ]+";
+                String[] tokens = data.split(delims);
+                byte byteValue;
+                String charStr = "";
+                for (int i = 0; i < tokens.length; i++) {
+                    byteValue = hexStingToByte(tokens[i]);
+                    charStr += (char) byteValue;
+                }
+                mReadDataField.setText(" " + charStr);
+            }
+            //mReadDataField.setText(" " +notificationCount + data);
         }
     }
 
@@ -401,7 +562,6 @@ public class DeviceControlActivity extends Activity {
                 } else {
                     charAttr = charAttr.concat("--");
                 }
-                Log.d(TAG,"............."+charAttr);
 
                 currentCharaData.put(
                         LIST_NAME, (SampleGattAttributes.lookup(uuid, unknownCharaString))+charAttr);
@@ -434,7 +594,8 @@ public class DeviceControlActivity extends Activity {
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
-        intentFilter.addAction(BluetoothLeService.ACTION_DATA_AVAILABLE);
+        intentFilter.addAction(BluetoothLeService.ACTION_IND_DATA_AVAILABLE);
+        intentFilter.addAction(BluetoothLeService.ACTION_RD_DATA_AVAILABLE);
         intentFilter.addAction("com.example.android.bluetoothlegatt.TEST_ACTION");
         intentFilter.addAction("BluetoothDevice.ACTION_BOND_STATE_CHANGED");
         return intentFilter;
