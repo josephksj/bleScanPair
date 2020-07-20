@@ -29,6 +29,7 @@ import android.bluetooth.BluetoothProfile;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 
@@ -50,15 +51,21 @@ public class BluetoothLeService extends Service {
     private String mBluetoothDeviceAddress;
     private BluetoothGatt mBluetoothGatt;
     private int mConnectionState = STATE_DISCONNECTED;
+    private Handler mHandler;
 
     private static final int STATE_DISCONNECTED = 0;
     private static final int STATE_CONNECTING = 1;
     private static final int STATE_CONNECTED = 2;
+    private static final int STATE_CONNECT_ERROR = 3;
 
     public final static String ACTION_GATT_CONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_CONNECTED";
     public final static String ACTION_GATT_DISCONNECTED =
             "com.example.bluetooth.le.ACTION_GATT_DISCONNECTED";
+
+    public final static String ACTION_GATT_ERROR =
+            "com.example.bluetooth.le.ACTION_GATT_ERROR";
+
     public final static String ACTION_GATT_SERVICES_DISCOVERED =
             "com.example.bluetooth.le.ACTION_GATT_SERVICES_DISCOVERED";
     public final static String ACTION_IND_DATA_AVAILABLE =
@@ -80,7 +87,57 @@ public class BluetoothLeService extends Service {
         @Override
         public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
             String intentAction;
-            if (newState == BluetoothProfile.STATE_CONNECTED) {
+            //status==GATT_SUCCESS
+            if (status == BluetoothGatt.GATT_SUCCESS) {
+                if (newState == BluetoothProfile.STATE_CONNECTED) {
+                    int bondstate = mBluetoothAdapter.getRemoteDevice(mBluetoothDeviceAddress).getBondState();
+                    if(bondstate ==BluetoothDevice.BOND_NONE || bondstate == BluetoothDevice.BOND_BONDED) {
+                        // Connected to device, proceed to discover it's services but delay a bit if needed
+                        final int delay = 1000;
+                        Runnable discoverServicesRunnable = new Runnable() {
+                            @Override
+                            public void run() {
+                                Log.d(TAG, "discovering services of with delay of " + delay + " ms");
+                                boolean result = mBluetoothGatt.discoverServices();
+                                if (!result) {
+                                    Log.e(TAG, "discoverServices failed to start");
+                                }
+                                //discoverServicesRunnable = null;
+                            }
+                        };
+                        mHandler.postDelayed(discoverServicesRunnable, delay);
+                          intentAction = ACTION_GATT_CONNECTED;
+                        mConnectionState = STATE_CONNECTED;
+                        broadcastUpdate(intentAction);
+                        Log.i(TAG, "Connected to GATT server.");
+                        // Attempts to discover services after successful connection.
+                        Log.i(TAG, "Attempting to start service discovery:" +
+                                mBluetoothGatt.discoverServices());
+                    } else if (bondstate == BluetoothDevice.BOND_BONDING) {
+                            // Bonding process in progress, let it complete
+                            Log.i(TAG, "waiting for bonding to complete");
+                    }
+                } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                    // We successfully disconnected on our own request
+                    intentAction = ACTION_GATT_DISCONNECTED;
+                    mConnectionState = STATE_DISCONNECTED;
+                    Log.i(TAG, "Disconnected from GATT server.");
+                    broadcastUpdate(intentAction);
+                    mBluetoothGatt.close();
+                } else {
+                    //STATE_CONNECTING or STATE_DISCONNECTING, ignore for now
+                }
+            } else {
+                //status == BluetoothGatt.GATT_ERROR
+                intentAction = ACTION_GATT_ERROR;
+                mConnectionState = STATE_CONNECT_ERROR;
+                broadcastUpdate(intentAction);
+                Log.i(TAG, "BluetoothGatt.GATT_ERROR  from GATT server.");
+                mBluetoothGatt.close();
+
+            }
+        }
+ /*             if (newState == BluetoothProfile.STATE_CONNECTED) {
                 intentAction = ACTION_GATT_CONNECTED;
                 mConnectionState = STATE_CONNECTED;
                 broadcastUpdate(intentAction);
@@ -95,7 +152,7 @@ public class BluetoothLeService extends Service {
                 Log.i(TAG, "Disconnected from GATT server.");
                 broadcastUpdate(intentAction);
             }
-        }
+  */
 
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status) {
@@ -213,6 +270,7 @@ public class BluetoothLeService extends Service {
         }
 
         mBluetoothAdapter = mBluetoothManager.getAdapter();
+        mHandler = new Handler();
         if (mBluetoothAdapter == null) {
             Log.e(TAG, "Unable to obtain a BluetoothAdapter.");
             return false;
@@ -254,16 +312,21 @@ public class BluetoothLeService extends Service {
             Log.w(TAG, "Device not found.  Unable to connect.");
             return false;
         }
+        mBluetoothDeviceAddress = address;
         // We want to directly connect to the device, so we are setting the autoConnect
         // parameter to false.
         //mBluetoothGatt = device.connectGatt(this, false, mGattCallback);
         //mBluetoothGatt = device.connectGatt(this, false, mGattCallback,
         //        BluetoothDevice.TRANSPORT_LE);
-        mBluetoothGatt = device.connectGatt(this, true, mGattCallback,
+
+        //Autoconnect only works for cached or bonded devices!
+        //Check the device has been cached, After creating a BluetoothDevice use the getType()
+        //if it returns TYPE_UNKNOWN = Not Cached, first scan for the device with this mac address
+        //(using a non-aggressive scan mode) and after that use auto connect again
+        mBluetoothGatt = device.connectGatt(this, false, mGattCallback,
                 BluetoothDevice.TRANSPORT_LE);
         Log.d(TAG, "Trying to create a new connection.");
-        mBluetoothDeviceAddress = address;
-        mConnectionState = STATE_CONNECTING;
+         mConnectionState = STATE_CONNECTING;
         return true;
     }
 

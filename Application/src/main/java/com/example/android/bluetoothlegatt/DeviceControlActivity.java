@@ -126,6 +126,9 @@ public class DeviceControlActivity extends Activity {
                 updateConnectionState(R.string.disconnected);
                 invalidateOptionsMenu();
                 clearUI();
+            } else if (BluetoothLeService.ACTION_GATT_ERROR.equals(action)) {
+                mConnected = false;
+                onBackPressed();    //Go back to the scanning mode
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
                 displayGattServices(mBluetoothLeService.getSupportedGattServices());
@@ -363,7 +366,7 @@ public class DeviceControlActivity extends Activity {
                 mBluetoothLeService.connect(mDeviceAddress);
                 return true;
             case R.id.menu_disconnect:
-                mBluetoothLeService.disconnect();
+                processDisconnect();
                 return true;
             case R.id.menu_pair:
                 mPaired = mBluetoothLeService.pair(mDeviceAddress);
@@ -376,6 +379,11 @@ public class DeviceControlActivity extends Activity {
                 return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    public void processDisconnect() {
+        mBluetoothLeService.disconnect();
+        mBluetoothLeService.close();
     }
 
     public void onToggleButtonClicked(View view) {
@@ -593,6 +601,8 @@ public class DeviceControlActivity extends Activity {
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_CONNECTED);
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_DISCONNECTED);
+        intentFilter.addAction(BluetoothLeService.ACTION_GATT_ERROR);
+
         intentFilter.addAction(BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED);
         intentFilter.addAction(BluetoothLeService.ACTION_IND_DATA_AVAILABLE);
         intentFilter.addAction(BluetoothLeService.ACTION_RD_DATA_AVAILABLE);
