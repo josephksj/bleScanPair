@@ -52,6 +52,7 @@ public class DeviceScanActivity extends ListActivity {
     private boolean mScanning;
     private boolean mConnectionInProgress;
     private Handler mHandler;
+    private boolean mInTestMode=false;
 
     private static final int REQUEST_ENABLE_BT = 1;
     // Stops scanning after 10 seconds.
@@ -94,6 +95,7 @@ public class DeviceScanActivity extends ListActivity {
         registerReceiver(adbCmdReceiver, bondFilter);
 
         mConnectionInProgress = false;
+        mInTestMode=false;
     }
 
     public void dispPairedDevice() {
@@ -124,11 +126,11 @@ public class DeviceScanActivity extends ListActivity {
         if (!mScanning) {
             menu.findItem(R.id.menu_stop).setVisible(false);
             menu.findItem(R.id.menu_scan).setVisible(true);
-            menu.findItem(R.id.menu_refresh).setActionView(null);
+            menu.findItem(R.id.menu_dev_test).setActionView(null);
         } else {
             menu.findItem(R.id.menu_stop).setVisible(true);
             menu.findItem(R.id.menu_scan).setVisible(false);
-            menu.findItem(R.id.menu_refresh).setActionView(
+            menu.findItem(R.id.menu_dev_test).setActionView(
                     R.layout.actionbar_indeterminate_progress);
         }
         return true;
@@ -143,6 +145,19 @@ public class DeviceScanActivity extends ListActivity {
                 break;
             case R.id.menu_stop:
                 scanLeDevice(false);
+                break;
+
+            case R.id.menu_dev_test:
+                mInTestMode = item.isChecked();
+                if(mInTestMode) {
+                    item.setChecked(false);
+                    item.setTitle("Test_ON");
+                    Log.d(TAG, " DevTest ON");
+                } else{
+                    item.setChecked(true);
+                    item.setTitle("Test_OFF");
+                    Log.d(TAG, " DevTest OFF");
+                }
                 break;
         }
         return true;
@@ -166,6 +181,7 @@ public class DeviceScanActivity extends ListActivity {
         setListAdapter(mLeDeviceListAdapter);
         scanLeDevice(true);
         mConnectionInProgress = false;
+        mInTestMode=false;
     }
 
     @Override
@@ -202,16 +218,20 @@ public class DeviceScanActivity extends ListActivity {
 */
        // pairDevice(device);
 
-
-        final Intent intent = new Intent(this, DeviceControlActivity.class);
-        intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.getName());
-        intent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.getAddress());
+        final Intent newIntent;
+        if(mInTestMode) {
+            newIntent = new Intent(this, DeviceTestActivity.class);
+        } else {
+            newIntent = new Intent(this, DeviceControlActivity.class);
+        }
+        newIntent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, device.getName());
+        newIntent.putExtra(DeviceControlActivity.EXTRAS_DEVICE_ADDRESS, device.getAddress());
         if (mScanning) {
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
             mScanning = false;
         }
-        startActivity(intent);
-    }
+        startActivity(newIntent);
+     }
     private void pairDevice_1(BluetoothDevice device) {
 
         String ACTION_PAIRING_REQUEST = "android.bluetooth.device.action.PAIRING_REQUEST";

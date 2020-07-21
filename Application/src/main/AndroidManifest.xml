@@ -47,6 +47,7 @@
         </activity>
         <activity android:name=".DeviceControlActivity"
             android:screenOrientation="portrait"/>
+        <activity android:name=".DeviceTestActivity"></activity>
         <service android:name=".BluetoothLeService" android:enabled="true"/>
     </application>
 

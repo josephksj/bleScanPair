@@ -323,7 +323,7 @@ public class BluetoothLeService extends Service {
         //Check the device has been cached, After creating a BluetoothDevice use the getType()
         //if it returns TYPE_UNKNOWN = Not Cached, first scan for the device with this mac address
         //(using a non-aggressive scan mode) and after that use auto connect again
-        mBluetoothGatt = device.connectGatt(this, false, mGattCallback,
+        mBluetoothGatt = device.connectGatt(this, true, mGattCallback,
                 BluetoothDevice.TRANSPORT_LE);
         Log.d(TAG, "Trying to create a new connection.");
          mConnectionState = STATE_CONNECTING;

@@ -384,6 +384,8 @@ public class DeviceControlActivity extends Activity {
     public void processDisconnect() {
         mBluetoothLeService.disconnect();
         mBluetoothLeService.close();
+        mConnected = false;
+        invalidateOptionsMenu();
     }
 
     public void onToggleButtonClicked(View view) {
