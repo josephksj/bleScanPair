@@ -22,7 +22,8 @@ int hndlr_drop_pair(int index, int argc, char *argv[]);
 int hndlr_ls_pair(int index, int argc, char *argv[]);
 int hndlr_start_connect(int index, int argc, char *argv[]);
 int hndlr_drop_connect(int index, int argc, char *argv[]);
-int hndlr_indication(int index, int argc, char *argv[]);
+int hndlr_start_ind(int index, int argc, char *argv[]);
+int hndlr_stop_ind(int index, int argc, char *argv[]);
 static void print_usage();
 
 //#define ENABLE_DBG
@@ -38,18 +39,18 @@ typedef struct cmd_lkt{
 /*********************************************************************************
 *********************************************************************************/
 cmd_lkt_t cmd_tbl[] = {
-        {"start_app",       hndlr_start_app,      "START_APP",    "<timeout> <num_disp_lines>"},
+        {"start_app",       hndlr_start_app,     "START_APP",    "<timeout> <num_disp_lines>"},
         {"start_scan",      hndlr_start_scan,    "START_SCAN",   "<timeout> <num_disp_lines>"},
-		{"stop_scan",		hndlr_stop_scan, 	  "STOP_SCAN", 	  "<timeout> <num_disp_lines>"},
-		{"ls_scan",			hndlr_ls_scan, 	  "LS_SCAN", 	  "<timeout> <num_disp_lines>"},
-		{"start_pair",		hndlr_start_pair, 	  "START_PAIR",   "<timeout> <num_disp_lines> <A/N> <Adrr/Name>"},
-		{"drop_pair",		hndlr_drop_pair, 	  "START_PAIR", 	  "Unpair with the device"},
-		{"ls_pair",			hndlr_ls_pair, 	  "LS_PAIR", 	  "Display current pair list"},
-		{"start_connect", 	hndlr_start_connect,"START_CONNECT", "Start Connecting device"},
-		{"drop_connect",	hndlr_drop_connect, "START_CONNECT",  "Disconnect the device"},
-		{"indication",		hndlr_indication, 	 "INDICATION",	  "Start/Stop Indication"},
+        {"stop_scan",       hndlr_stop_scan,     "STOP_SCAN",    "<timeout> <num_disp_lines>"},
+        {"ls_scan",         hndlr_ls_scan,       "LS_SCAN",      "<timeout> <num_disp_lines>"},
+        {"start_pair",      hndlr_start_pair,    "START_PAIR",   "<timeout> <num_disp_lines> <A/N> <Adrr/Name>"},
+        {"drop_pair",       hndlr_drop_pair,     "START_PAIR",   "<timeout> <num_disp_lines> <A/N> <Adrr/Name>"},
+        {"ls_pair",         hndlr_ls_pair,       "LS_PAIR",      "Display current pair list"},
+        {"start_connect",   hndlr_start_connect,"START_CONNECT", "<timeout> <num_disp_lines> <A/N> <Adrr/Name>"},
+        {"drop_connect",    hndlr_drop_connect, "START_CONNECT", "<timeout> <num_disp_lines> <A/N> <Adrr/Name>"},
+        {"start_ind",       hndlr_start_ind,    "INDICATION",    "<timeout> <num_disp_lines> <UUID>"},
+        {"stop_ind",        hndlr_stop_ind,     "INDICATION",    "<timeout> <num_disp_lines> <UUID>"},
 };
-
 
 /*********************************************************************************
 *********************************************************************************/
@@ -408,6 +409,50 @@ int hndlr_indication(int index, int argc, char *argv[])
     issue_adb_cmd_and_wait_for_response("indication", NULL, cmd_tbl[index].msg_tag, timeout, num_line);
 	
 	return 0;
+}
+
+/*********************************************************************************
+*********************************************************************************/
+int do_indication_start_stop(int index, int argc, char *argv[], char *stop_start)
+{
+
+    if(argc != 5) {
+         printf("Invalid Param for do_indication_start_stop \n");
+         print_usage();
+         return -1;
+     }
+    int timeout   = atoi(argv[2]);
+    int num_line  = atoi(argv[3]);
+     issue_adb_cmd_and_wait_for_response(stop_start, argv[4], cmd_tbl[index].msg_tag, timeout, num_line);
+
+    return 0;
+
+}
+
+/*********************************************************************************
+*********************************************************************************/
+int hndlr_start_ind(int index, int argc, char *argv[])
+{
+#ifdef ENABLE_DBG
+    printf("In hndlr_indication, looking for TAG: %s\n", cmd_tbl[index].msg_tag);
+#endif
+    do_indication_start_stop(index, argc, argv, "indication");
+
+    return 0;
+}
+
+/*********************************************************************************
+*********************************************************************************/
+int  hndlr_stop_ind(int index, int argc, char *argv[])
+{
+#ifdef ENABLE_DBG
+    printf("In hndlr_indication, looking for TAG: %s\n", cmd_tbl[index].msg_tag);
+#endif
+    printf("hndlr_stop_ind Stop Indication is not supproted nwo\n");
+  //do_indication_start_stop(index, argc, argv, "'indication");
+
+    return 0;
+
 }
 
 /*********************************************************************************
