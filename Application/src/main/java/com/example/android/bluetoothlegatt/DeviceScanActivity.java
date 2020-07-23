@@ -108,6 +108,7 @@ public class DeviceScanActivity extends ListActivity {
                 String deviceName = device.getName();
                 String deviceHardwareAddress = device.getAddress(); // MAC address
                 Log.d(TAG, deviceHardwareAddress+ "  "+ deviceName);
+                Log.d("LS_PAIR", "Paired Devices: "+ deviceHardwareAddress+ "  "+ deviceName);//Special tag used for adb based test
             }
         }
         Log.d(TAG, "======== Paired Devices End ===========");
@@ -127,12 +128,12 @@ public class DeviceScanActivity extends ListActivity {
             menu.findItem(R.id.menu_stop).setVisible(false);
             menu.findItem(R.id.menu_scan).setVisible(true);
             menu.findItem(R.id.menu_dev_test).setActionView(null);
-        } else {
+         } else {
             menu.findItem(R.id.menu_stop).setVisible(true);
             menu.findItem(R.id.menu_scan).setVisible(false);
             menu.findItem(R.id.menu_dev_test).setActionView(
                     R.layout.actionbar_indeterminate_progress);
-        }
+              }
         return true;
     }
 
@@ -268,7 +269,7 @@ public class DeviceScanActivity extends ListActivity {
 
     private void scanLeDevice(final boolean enable) {
         Log.d(TAG, "In scanLeDevice KSJ");
-        if (enable) {
+         if (enable) {
             // Stops scanning after a pre-defined scan period.
             mHandler.postDelayed(new Runnable() {
                 @Override
@@ -277,14 +278,17 @@ public class DeviceScanActivity extends ListActivity {
                     mBluetoothAdapter.stopLeScan(mLeScanCallback);
                     invalidateOptionsMenu();
                     displayScanResults();
+                    Log.d("START_SCAN", "Scan Finished"); //Special tag used for adb based test
                 }
             }, SCAN_PERIOD);
 
             mScanning = true;
             mBluetoothAdapter.startLeScan(mLeScanCallback);
-        } else {
+             Log.d("START_SCAN", "Scan Started"); //Special tag used for adb based test
+          } else {
             mScanning = false;
             mBluetoothAdapter.stopLeScan(mLeScanCallback);
+             Log.d("STOP_SCAN", "Scan Stopped"); //Special tag used for adb based test
         }
         invalidateOptionsMenu();
     }
@@ -296,8 +300,12 @@ public class DeviceScanActivity extends ListActivity {
              BluetoothDevice curDev = mLeDeviceListAdapter.getDevice(i);
             if(curDev.getName() != null) {
                 Log.d(TAG, "Device-" + i + " " + curDev.getAddress() + " " + curDev.getName());
+                //Special tag used for adb based test
+                Log.d("LS_SCAN", "Device-" + i + " " + curDev.getAddress() + " " + curDev.getName());
             } else {
                 Log.d(TAG, "Device-" + i + " " + curDev.getAddress() + " Unknown Device");
+                //Special tag used for adb based test
+                Log.d("LS_SCAN", "Device-" + i + " " + curDev.getAddress() + " Unknown Device");
             }
         }
     }
@@ -425,14 +433,23 @@ public class DeviceScanActivity extends ListActivity {
                 int state = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
                 int previousState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
                 Log.d(TAG, "<<<ACTION_BOND_STATE_CHANGED: state:>>> " + state + ", previous:" + previousState);
+                if(state == BluetoothDevice.BOND_BONDING) {
+                    Log.i("START_PAIR", "Pairing BONDING"); //Special tag for adb based test
+                } else if(state == BluetoothDevice.BOND_BONDED) {
+                    Log.i("START_PAIR", "Pairing BONDED"); //Special tag for adb based test
+                } else if(state == BluetoothDevice.BOND_NONE) {
+                    Log.i("START_PAIR", "Pairing DROPPED"); //Special tag for adb based test
+                }
                 //listener.onDevicePairingEnded();
                 // BOND_BONDED = 12
                 // BOND_BONDING = 11
                 // BOND_NONE = 10
             } else if (BluetoothDevice.ACTION_ACL_CONNECTED.equals(action)) {
                 Log.d(TAG, "<<<ACTION_ACL_CONNECTED:  >>> " );
+                //Log.i("START_CONNECT", "Connected "); //Tag for adb based test
             } else if (BluetoothDevice.ACTION_ACL_DISCONNECTED.equals(action)) {
                 Log.d(TAG, "<<<ACTION_ACL_DISCONNECTED:  >>> " );
+                //Log.i("START_CONNECT", "Disonnected "); //Tag for adb based test
             }else if (BluetoothDevice.ACTION_ACL_DISCONNECT_REQUESTED.equals(action)) {
                 Log.d(TAG, "<<<ACTION_ACL_DISCONNECT_REQUESTED:  >>> " );
             }else if (BluetoothDevice.ACTION_PAIRING_REQUEST.equals(action)) {
@@ -451,6 +468,7 @@ public class DeviceScanActivity extends ListActivity {
         }
         if(tokens.length < 3) {
             Log.i(TAG, logMsg + "Invalid param (pair A/N <address>/<name>)");
+            Log.i("START_PAIR", "Pairing Invalid Param"); //Special tag for adb based test
             return;
         }
         String address;
@@ -458,22 +476,26 @@ public class DeviceScanActivity extends ListActivity {
             address = getAddressFromName(tokens[2]);
             if(address.isEmpty()) {
                 Log.i(TAG, logMsg + "ScanList missing: "+tokens[2]);
+                Log.i("START_PAIR", "Pairing Invalid Param"); //Special tag for adb based test
                 return;
             }
         } else if("A".equals(tokens[1])) {
             address = tokens[2];
         } else {
             Log.i(TAG, logMsg + "Invalid param (pair A/N <address>/<name>)");
+            Log.i("START_PAIR", "Pairing Invalid Param"); //Special tag for adb based test
             return;
         }
         Log.i(TAG, logMsg + "DeviceWithAddress: "+ address);
         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(address);
         if (device == null) {
             Log.i(TAG, logMsg + "Device Not Detected: "+tokens[1]);
+            Log.i("START_PAIR", "Device Not Found"); //Special tag for adb based test
             return;
         }
         if(flagPairing) {
             pairDevice(device);
+            Log.i("START_PAIR", "Pairing Started"); //Special tag for adb based test
         } else {
             unpairDevice(device);
         }
@@ -482,10 +504,12 @@ public class DeviceScanActivity extends ListActivity {
     private void connectDevice(String[] tokens) {
         if(mConnectionInProgress) {
             Log.i(TAG, "Connected or Connection In Progress");
+            Log.i("START_CONNECT", "Failed Already Connected"); //Tag for adb based test
             return;
         }
         if(tokens.length != 3) {
             Log.i(TAG, "\"Invalid param (pair A/N <address>/<name>)");
+            Log.i("START_CONNECT", "Invalid Cmd Parameter"); //Tag for adb based test
             return;
         }
         String address;
@@ -495,6 +519,7 @@ public class DeviceScanActivity extends ListActivity {
             address = getAddressFromName(tokens[2]);
             if(address.isEmpty()) {
                 Log.i(TAG, "ScanList missing: "+tokens[2]);
+                Log.i("START_CONNECT", "Invalid Cmd Missing Addr/Name"); //Tag for adb based test
                 return;
             }
             devName = tokens[2];
@@ -502,9 +527,11 @@ public class DeviceScanActivity extends ListActivity {
             address = tokens[2];
          } else {
             Log.i(TAG, "Invalid param (pair A/N <address>/<name>)");
+            Log.i("START_CONNECT", "Invalid param (pair A/N <address>/<name>"); //Tag for adb based test
             return;
         }
-        Log.i(TAG, "Connecting to: "+devName + " Addr: "+address);
+        Log.i(TAG, "Connecting to: "+address + " (DevName: " + devName + ")");
+        Log.i("START_CONNECT", "Start Connecting: "+address + " (DevName: " + devName + ")"); //Tag for adb based test
 
         final Intent intentController = new Intent(DeviceScanActivity.this, DeviceControlActivity.class);
         intentController.putExtra(DeviceControlActivity.EXTRAS_DEVICE_NAME, devName);

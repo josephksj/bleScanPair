@@ -473,6 +473,8 @@ public class BluetoothLeService extends Service {
         } catch (Exception e) {
             Log.e(TAG, e.getMessage());
         }
+        mBluetoothGatt = null;
+        mBluetoothDeviceAddress = null;
         return true;
     }
 

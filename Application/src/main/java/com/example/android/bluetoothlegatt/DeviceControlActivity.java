@@ -106,7 +106,6 @@ public class DeviceControlActivity extends Activity {
         }
     };
 
-
     // Handles various events fired by the Service.
     // ACTION_GATT_CONNECTED: connected to a GATT server.
     // ACTION_GATT_DISCONNECTED: disconnected from a GATT server.
@@ -121,13 +120,16 @@ public class DeviceControlActivity extends Activity {
                 mConnected = true;
                 updateConnectionState(R.string.connected);
                 invalidateOptionsMenu();
+                Log.i("START_CONNECT", "Connected "); //Tag for adb based test
             } else if (BluetoothLeService.ACTION_GATT_DISCONNECTED.equals(action)) {
                 mConnected = false;
+                Log.i("START_CONNECT", "Disonnected "); //Tag for adb based test
                 updateConnectionState(R.string.disconnected);
                 invalidateOptionsMenu();
                 clearUI();
-            } else if (BluetoothLeService.ACTION_GATT_ERROR.equals(action)) {
+              } else if (BluetoothLeService.ACTION_GATT_ERROR.equals(action)) {
                 mConnected = false;
+                Log.i("START_CONNECT", "Connection GATT_ERROR "); //Tag for adb based test
                 onBackPressed();    //Go back to the scanning mode
             } else if (BluetoothLeService.ACTION_GATT_SERVICES_DISCOVERED.equals(action)) {
                 // Show all the supported services and characteristics on the user interface.
@@ -148,8 +150,10 @@ public class DeviceControlActivity extends Activity {
                     if (tokens[0].equals("disconnect")) {
                         // mBluetoothLeService.connect(mDeviceAddress);
                         mBluetoothLeService.disconnect();
+                        Log.i("START_CONNECT", "Disonnecting "); //Tag for adb based test
                         onBackPressed(); //Issue connect from ScanActivity
                     } else if (tokens[0].equals("indication")) {
+                        Log.i("INDICATION", "Setting Indication "); //Tag for adb based test
                         processIndicationCmd(tokens);
                     }
                 }
